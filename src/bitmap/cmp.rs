@@ -33,9 +33,7 @@ impl RoaringBitmap {
     ///
     /// ```
     pub fn is_disjoint(&self, other: &Self) -> bool {
-        self.pairs(other)
-            .filter_map(|(c1, c2)| c1.zip(c2))
-            .all(|(c1, c2)| c1.is_disjoint(c2))
+        self.pairs(other).filter_map(|(c1, c2)| c1.zip(c2)).all(|(c1, c2)| c1.is_disjoint(c2))
     }
 
     /// Returns `true` if this set is a subset of `other`.
