@@ -119,11 +119,7 @@ impl BitOr<&Container> for &Container {
 
     fn bitor(self, rhs: &Container) -> Container {
         let store = BitOr::bitor(&self.store, &rhs.store);
-        let mut container = Container {
-            key: self.key,
-            len: store.len(),
-            store,
-        };
+        let mut container = Container { key: self.key, len: store.len(), store };
         container.ensure_correct_store();
         container
     }
@@ -150,11 +146,7 @@ impl BitAnd<&Container> for &Container {
 
     fn bitand(self, rhs: &Container) -> Container {
         let store = BitAnd::bitand(&self.store, &rhs.store);
-        let mut container = Container {
-            key: self.key,
-            len: store.len(),
-            store,
-        };
+        let mut container = Container { key: self.key, len: store.len(), store };
         container.ensure_correct_store();
         container
     }
@@ -181,11 +173,7 @@ impl Sub<&Container> for &Container {
 
     fn sub(self, rhs: &Container) -> Container {
         let store = Sub::sub(&self.store, &rhs.store);
-        let mut container = Container {
-            key: self.key,
-            len: store.len(),
-            store,
-        };
+        let mut container = Container { key: self.key, len: store.len(), store };
         container.ensure_correct_store();
         container
     }
@@ -204,11 +192,7 @@ impl BitXor<&Container> for &Container {
 
     fn bitxor(self, rhs: &Container) -> Container {
         let store = BitXor::bitxor(&self.store, &rhs.store);
-        let mut container = Container {
-            key: self.key,
-            len: store.len(),
-            store,
-        };
+        let mut container = Container { key: self.key, len: store.len(), store };
         container.ensure_correct_store();
         container
     }
