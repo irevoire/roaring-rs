@@ -1,6 +1,6 @@
 use std::cmp::Ordering;
-use std::mem;
 use std::ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Sub, SubAssign};
+use std::{cmp, mem};
 
 use retain_mut::RetainMut;
 
@@ -191,11 +191,32 @@ impl BitOr<&RoaringBitmap> for &RoaringBitmap {
 
     /// An `union` between two sets.
     fn bitor(self, rhs: &RoaringBitmap) -> RoaringBitmap {
-        if self.len() <= rhs.len() {
-            BitOr::bitor(rhs.clone(), self)
-        } else {
-            BitOr::bitor(self.clone(), rhs)
+        let len = cmp::max(self.containers.len(), rhs.containers.len());
+        let mut containers = Vec::with_capacity(len);
+
+        let mut iter_lhs = self.containers.iter().peekable();
+        let mut iter_rhs = rhs.containers.iter().peekable();
+
+        loop {
+            match (iter_lhs.peek(), iter_rhs.peek()) {
+                (Some(lhs), Some(rhs)) => {
+                    let container = match lhs.key.cmp(&rhs.key) {
+                        Ordering::Less => iter_lhs.next().cloned().unwrap(),
+                        Ordering::Greater => iter_rhs.next().cloned().unwrap(),
+                        Ordering::Equal => {
+                            let (lhs, rhs) = iter_lhs.next().zip(iter_rhs.next()).unwrap();
+                            BitOr::bitor(lhs, rhs)
+                        }
+                    };
+                    containers.push(container);
+                }
+                (Some(_), None) => containers.extend(iter_lhs.by_ref().cloned()),
+                (None, Some(_)) => containers.extend(iter_rhs.by_ref().cloned()),
+                (None, None) => break,
+            }
         }
+
+        RoaringBitmap { containers }
     }
 }
 
@@ -264,11 +285,38 @@ impl BitAnd<&RoaringBitmap> for &RoaringBitmap {
 
     /// An `intersection` between two sets.
     fn bitand(self, rhs: &RoaringBitmap) -> RoaringBitmap {
-        if rhs.len() < self.len() {
-            BitAnd::bitand(self.clone(), rhs)
-        } else {
-            BitAnd::bitand(rhs.clone(), self)
+        let mut containers = Vec::new();
+        let mut iter_lhs = self.containers.iter().peekable();
+        let mut iter_rhs = rhs.containers.iter().peekable();
+
+        loop {
+            match (iter_lhs.peek(), iter_rhs.peek()) {
+                (None, None) => break,
+                (Some(lhs), Some(rhs)) => match lhs.key.cmp(&rhs.key) {
+                    Ordering::Equal => {
+                        let (lhs, rhs) = iter_lhs.next().zip(iter_rhs.next()).unwrap();
+                        let container = BitAnd::bitand(lhs, rhs);
+                        if container.len != 0 {
+                            containers.push(container);
+                        }
+                    }
+                    Ordering::Less => {
+                        iter_lhs.next().unwrap();
+                    }
+                    Ordering::Greater => {
+                        iter_rhs.next().unwrap();
+                    }
+                },
+                (Some(_), None) => {
+                    iter_lhs.next().unwrap();
+                }
+                (None, Some(_)) => {
+                    iter_rhs.next().unwrap();
+                }
+            }
         }
+
+        RoaringBitmap { containers }
     }
 }
 
@@ -336,7 +384,7 @@ impl Sub<RoaringBitmap> for &RoaringBitmap {
 
     /// A `difference` between two sets.
     fn sub(self, rhs: RoaringBitmap) -> RoaringBitmap {
-        Sub::sub(self.clone(), rhs)
+        Sub::sub(self, &rhs)
     }
 }
 
@@ -345,7 +393,40 @@ impl Sub<&RoaringBitmap> for &RoaringBitmap {
 
     /// A `difference` between two sets.
     fn sub(self, rhs: &RoaringBitmap) -> RoaringBitmap {
-        Sub::sub(self.clone(), rhs)
+        let mut iter_lhs = self.containers.iter().peekable();
+        let mut iter_rhs = rhs.containers.iter().peekable();
+        let mut containers = Vec::new();
+
+        loop {
+            match (iter_lhs.peek(), iter_rhs.peek()) {
+                (None, None) => break,
+                (Some(_), None) => {
+                    let container = iter_lhs.next().cloned().unwrap();
+                    containers.push(container);
+                }
+                (None, Some(_)) => {
+                    iter_rhs.next().unwrap();
+                }
+                (Some(lhs), Some(rhs)) => match lhs.key.cmp(&rhs.key) {
+                    Ordering::Less => {
+                        let container = iter_lhs.next().cloned().unwrap();
+                        containers.push(container);
+                    }
+                    Ordering::Equal => {
+                        let (lhs, rhs) = iter_lhs.next().zip(iter_rhs.next()).unwrap();
+                        let container = Sub::sub(lhs, rhs);
+                        if container.len != 0 {
+                            containers.push(container);
+                        }
+                    }
+                    Ordering::Greater => {
+                        iter_rhs.next().unwrap();
+                    }
+                },
+            }
+        }
+
+        RoaringBitmap { containers }
     }
 }
 
@@ -405,11 +486,35 @@ impl BitXor<&RoaringBitmap> for &RoaringBitmap {
 
     /// A `symmetric difference` between two sets.
     fn bitxor(self, rhs: &RoaringBitmap) -> RoaringBitmap {
-        if self.len() < rhs.len() {
-            BitXor::bitxor(self, rhs.clone())
-        } else {
-            BitXor::bitxor(self.clone(), rhs)
+        let mut containers = Vec::new();
+        let mut iter_lhs = self.containers.iter().peekable();
+        let mut iter_rhs = rhs.containers.iter().peekable();
+
+        loop {
+            match (iter_lhs.peek(), iter_rhs.peek()) {
+                (None, None) => break,
+                (Some(_), None) => containers.extend(iter_lhs.by_ref().cloned()),
+                (None, Some(_)) => containers.extend(iter_rhs.by_ref().cloned()),
+                (Some(lhs), Some(rhs)) => {
+                    let container = match lhs.key.cmp(&rhs.key) {
+                        Ordering::Equal => {
+                            let (lhs, rhs) = iter_lhs.next().zip(iter_rhs.next()).unwrap();
+                            let container = BitXor::bitxor(lhs, rhs);
+                            if container.len != 0 {
+                                container
+                            } else {
+                                continue;
+                            }
+                        }
+                        Ordering::Less => iter_lhs.next().cloned().unwrap(),
+                        Ordering::Greater => iter_rhs.next().cloned().unwrap(),
+                    };
+                    containers.push(container);
+                }
+            }
         }
+
+        RoaringBitmap { containers }
     }
 }
 
@@ -472,8 +577,7 @@ impl BitXorAssign<&RoaringBitmap> for RoaringBitmap {
                 }
                 (Some(l), Some(r)) => match l.key.cmp(&r.key) {
                     Ordering::Equal => {
-                        let mut lhs = left.next().unwrap();
-                        let rhs = right.next().unwrap();
+                        let (mut lhs, rhs) = left.next().zip(right.next()).unwrap();
                         BitXorAssign::bitxor_assign(&mut lhs, rhs);
                         if lhs.len != 0 {
                             self.containers.push(lhs);
