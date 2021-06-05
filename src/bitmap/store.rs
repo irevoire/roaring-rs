@@ -32,12 +32,9 @@ impl Store {
             }
             Bitmap(ref mut bits) => {
                 let (key, bit) = (key(index), bit(index));
-                if bits[key] & (1 << bit) == 0 {
-                    bits[key] |= 1 << bit;
-                    true
-                } else {
-                    false
-                }
+                let res = (bits[key] & (1 << bit)) == 0;
+                bits[key] |= 1 << bit;
+                res
             }
         }
     }
