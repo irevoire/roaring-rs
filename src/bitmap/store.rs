@@ -32,12 +32,9 @@ impl Store {
             }
             Bitmap(ref mut bits) => {
                 let (key, bit) = (key(index), bit(index));
-                if bits[key] & (1 << bit) == 0 {
-                    bits[key] |= 1 << bit;
-                    true
-                } else {
-                    false
-                }
+                let res = bits[key] | (1 << bit);
+                bits[key] = res;
+                res != 0
             }
         }
     }
@@ -126,12 +123,9 @@ impl Store {
             Array(ref mut vec) => vec.binary_search(&index).map(|loc| vec.remove(loc)).is_ok(),
             Bitmap(ref mut bits) => {
                 let (key, bit) = (key(index), bit(index));
-                if bits[key] & (1 << bit) != 0 {
-                    bits[key] &= !(1 << bit);
-                    true
-                } else {
-                    false
-                }
+                let res = bits[key] & (1 << bit);
+                bits[key] &= !res;
+                res != 0
             }
         }
     }

@@ -60,9 +60,7 @@ impl RoaringBitmap {
                 (None, _) => (),
                 (_, None) => return false,
                 (Some(c1), Some(c2)) => {
-                    if !c1.is_subset(c2) {
-                        return false;
-                    }
+                    return c1.is_subset(c2);
                 }
             }
         }
